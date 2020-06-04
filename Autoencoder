@@ -46,15 +46,6 @@ encoder = Model(m.input, m.get_layer('bottleneck').output)
 Zenc = encoder.predict(Data)  # bottleneck representation
 Renc = m.predict(Data)        # reconstruction
 
-plt.subplot(122)
-plt.title('Autoencoder')
-plt.scatter(Zenc[:,0], Zenc[:,1], s=8, cmap='tab10')
-plt.gca().get_xaxis().set_ticklabels([])
-plt.gca().get_yaxis().set_ticklabels([])
-
-plt.tight_layout()
-
-
 Nc = range(1, 20)
 kmeans = [KMeans(n_clusters=i) for i in Nc]
 score = [kmeans[i].fit(Zenc[:, 0:2]).score(Zenc[:, 0:2]) for i in range(len(kmeans))]
