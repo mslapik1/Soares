@@ -1,0 +1,81 @@
+import numpy as np
+import pandas as pd
+from pandas import DataFrame
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pylab as pl
+from sklearn import decomposition
+from kneed import KneeLocator
+from sklearn.manifold import TSNE
+
+df = pd.read_excel (r'/Users/mitchellslapik/Downloads/UTH_Adults_ENBD_all.xlsx')
+
+patients = df.loc[df['Group'] != 0]
+
+GrayMatter = patients.loc[:, 'Left_Lateral_Ventricle':'CC_Anterior']
+CranialVolume = patients.loc[:, 'EstimatedTotalIntraCranialVol_1']
+
+GrayMatter = GrayMatter.dropna()
+CranialVolume = CranialVolume.dropna()
+
+Data = pd.concat([GrayMatter, CranialVolume], axis = 1, sort = False)
+
+Data = Data.loc[:,'Left_Lateral_Ventricle':'CC_Anterior'].div(Data.EstimatedTotalIntraCranialVol_1, axis = 0)
+
+Data = Data.to_numpy()
+
+
+import keras
+from keras.datasets import mnist
+from keras.models import Sequential, Model
+from keras.layers import Dense
+from keras.optimizers import Adam
+
+m = Sequential()
+m.add(Dense(45,  activation='elu', input_shape=(45,)))
+m.add(Dense(10,  activation='elu'))
+m.add(Dense(2,    activation='linear', name="bottleneck"))
+m.add(Dense(10,  activation='elu'))
+m.add(Dense(25,  activation='elu'))
+m.add(Dense(45,  activation='sigmoid'))
+m.compile(loss='mean_squared_error', optimizer = Adam())
+history = m.fit(Data, Data, batch_size=128, epochs=5, verbose=1)
+
+encoder = Model(m.input, m.get_layer('bottleneck').output)
+Zenc = encoder.predict(Data)  # bottleneck representation
+Renc = m.predict(Data)        # reconstruction
+
+plt.subplot(122)
+plt.title('Autoencoder')
+plt.scatter(Zenc[:,0], Zenc[:,1], s=8, cmap='tab10')
+plt.gca().get_xaxis().set_ticklabels([])
+plt.gca().get_yaxis().set_ticklabels([])
+
+plt.tight_layout()
+
+
+Nc = range(1, 20)
+kmeans = [KMeans(n_clusters=i) for i in Nc]
+score = [kmeans[i].fit(Zenc[:, 0:2]).score(Zenc[:, 0:2]) for i in range(len(kmeans))]
+pl.plot(Nc,score)
+pl.xlabel('Number of Clusters')
+pl.ylabel('Score')
+pl.title('Elbow Curve')
+
+kn = KneeLocator(Nc, score, curve='concave', direction='increasing')
+plt.scatter(kn.knee, score[kn.knee], c='red', s=50)
+pl.show()
+
+kmeans = KMeans(n_clusters=kn.knee).fit(Zenc[:, 0:2])
+centroids = kmeans.cluster_centers_
+print(centroids)
+
+pl.title('Autoencoder')
+pl.xlabel('Node 1')
+pl.ylabel('Node 2')
+
+plt.scatter(Zenc[:,0], Zenc[:, 1], c= kmeans.labels_.astype(float), s=50, alpha=0.5)
+plt.scatter(centroids[:, 0], centroids[:, 1], c='red', s=50)
+plt.margins(x=-0, y=-0.25) 
+plt.show()
